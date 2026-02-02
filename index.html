@@ -2,61 +2,101 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Smith–Waite Tarot — Single‑File (EN／粵) + Poe AI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Smith–Waite Tarot — EN／粵 + Poe API</title>
 <style>
   :root{
+    /* Responsive card sizing */
+    --card-w: clamp(64px, 18vw, 96px);
+    --ratio: 1.636;                /* 88x144 ≈ 1.636 */
+    --card-h: calc(var(--card-w) * var(--ratio));
+    --overlap-x: clamp(36px, 11vw, 60px); /* visual overlap */
     --bg:#0b0f14; --fg:#e7f0ff; --muted:#a7b0c0; --accent:#ffcc66;
-    --card-w:88px; --card-h:144px; --gap:8px; --overlap-x:56px;
   }
-  html,body{height:100%}
-  body{margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","PingFang HK","Microsoft JhengHei",sans-serif;
-       background:radial-gradient(1200px 800px at 10% -10%, #182032 0%, #0b0f14 40%, #06080c 100%); color:var(--fg)}
-  header{position:sticky;top:0;z-index:5;backdrop-filter:blur(6px);background:rgba(6,8,12,.7);border-bottom:1px solid #1c2432;
-         padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
-  header h1{margin:0 10px 0 0;font-size:18px;font-weight:600;letter-spacing:.3px}
-  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  select,button,textarea,input{background:#101827;color:var(--fg);border:1px solid #243049;border-radius:8px;padding:8px 10px;font-size:14px}
+
+  html,body{height:100%; overflow-x:hidden;} /* keep page width stable */
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","PingFang HK","Microsoft JhengHei",sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #182032 0%, #0b0f14 40%, #06080c 100%);
+    color:var(--fg);
+  }
+
+  header{
+    position:sticky; top:0; z-index:5;
+    backdrop-filter:blur(6px);
+    background:rgba(6,8,12,.7);
+    border-bottom:1px solid #1c2432;
+    padding:10px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  }
+  header h1{margin:0 10px 0 0; font-size:18px; font-weight:600; letter-spacing:.3px}
+
+  .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  select,button,textarea,input{
+    background:#101827; color:var(--fg); border:1px solid #243049; border-radius:8px; padding:8px 10px; font-size:14px
+  }
   textarea{min-height:72px}
   button.primary{background:#203659;border-color:#2d4a7c}
   button:disabled{opacity:.55}
-  main{display:grid;grid-template-columns:1fr;gap:16px;padding:16px}
-  section{background:rgba(16,24,39,.55);border:1px solid #23324b;border-radius:12px;padding:12px}
-  section h2{margin:6px 0 10px;font-size:16px;color:var(--accent)}
-  .legend{color:var(--muted);font-size:13px;line-height:1.45}
-  .status{font-size:13px}
-  .ok{color:#aaffbd}.warn{color:#ffd48f}.err{color:#ffb0a0}
-  .list{max-height:160px;overflow:auto;font-family:ui-monospace,Consolas,Menlo,monospace;font-size:12px;background:rgba(10,16,25,.6);border:1px solid #273a5a;border-radius:8px;padding:8px;white-space:pre}
 
-  /* Pool: 3 overlapped rows, left aligned */
-  #poolWrap{overflow-x:auto;padding-bottom:8px}
-  #poolWrap[data-locked="true"]{opacity:.6;pointer-events:none}
-  #poolRows{display:grid;grid-template-rows:repeat(3,var(--card-h));gap:8px;min-height:calc(var(--card-h)*3 + var(--gap)*2)}
-  .poolRow{display:flex;align-items:flex-start}
-  .poolRow .card{width:var(--card-w);height:var(--card-h);position:relative;cursor:pointer;user-select:none;
-                 margin-left:calc(-1 * var(--overlap-x));transition:transform .12s ease,box-shadow .12s ease;z-index:1}
-  .poolRow .card:first-child{margin-left:0}
-  .poolRow .card:hover{transform:translateY(-4px);box-shadow:0 4px 12px rgba(0,0,0,.35);z-index:99}
-  .face{position:absolute;inset:0;border-radius:10px;overflow:hidden;border:1px solid #2a3a59;background:#08111f}
-  .face img{width:100%;height:100%;object-fit:cover;display:block}
+  main{display:grid; grid-template-columns:1fr; gap:16px; padding:16px}
+  section{
+    background:rgba(16,24,39,.55);
+    border:1px solid #23324b; border-radius:12px; padding:12px;
+    min-width:0;                  /* IMPORTANT: prevent grid item from widening page */
+  }
+  section h2{margin:6px 0 10px; font-size:16px; color:var(--accent)}
+  .legend{color:var(--muted); font-size:13px; line-height:1.45}
+  .status{font-size:13px} .ok{color:#aaffbd} .warn{color:#ffd48f} .err{color:#ffb0a0}
+  .list{max-height:160px; overflow:auto; font-family:ui-monospace,Consolas,Menlo,monospace; font-size:12px; background:rgba(10,16,25,.6); border:1px solid #273a5a; border-radius:8px; padding:8px; white-space:pre}
+
+  /* ====== Pool: single-row, its own horizontal scroller only ====== */
+  #poolWrap{
+    width:100%;
+    overflow-x:auto;          /* horizontal scroll lives here */
+    overflow-y:hidden;        /* no vertical scroll inside the pool */
+    -webkit-overflow-scrolling: touch;    /* iOS momentum */
+    overscroll-behavior-x: contain;       /* stop scroll chaining */
+    touch-action: pan-x pinch-zoom;       /* hint: horizontal pan belongs here */
+  }
+  #poolWrap[data-locked="true"]{opacity:.6; pointer-events:none}
+  #poolRows{ display:block; min-height:var(--card-h); }
+  .poolRow{ display:flex; align-items:flex-start; height:var(--card-h); }
+
+  .poolRow .card{
+    width:var(--card-w); height:var(--card-h);
+    position:relative; cursor:pointer; user-select:none; flex:0 0 auto;
+    margin-left:calc(-1 * var(--overlap-x));
+    transition:transform .12s ease, box-shadow .12s ease; z-index:1;
+  }
+  .poolRow .card:first-child{ margin-left:0 }
+  .poolRow .card:hover{ transform:translateY(-4px); box-shadow:0 4px 12px rgba(0,0,0,.35); z-index:99 }
+  .face{position:absolute; inset:0; border-radius:10px; overflow:hidden; border:1px solid #2a3a59; background:#08111f}
+  .face img{width:100%; height:100%; object-fit:cover; display:block}
   .card.reversed .face{transform:rotate(180deg)}
-  .caption{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:11px;color:var(--muted);
-           white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .caption{position:absolute; bottom:-18px; left:0; right:0; text-align:center; font-size:11px; color:var(--muted);
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
-  /* Spread: left aligned */
-  #spread{display:grid;justify-content:start;align-items:start;min-height:240px;gap:10px}
-  .spread-10{grid-template-columns:repeat(6,var(--card-w));grid-auto-rows:var(--card-h);justify-content:start;gap:12px}
-  .slot{width:var(--card-w);height:var(--card-h);border:1px dashed #33496c;border-radius:10px;display:flex;align-items:center;
-        justify-content:center;color:#6a86b1;font-size:12px;padding:4px;position:relative;text-align:center}
-  .pos-label{position:absolute;top:-18px;left:0;right:0;text-align:center;color:#9fb4d8;font-size:11px}
+  /* ====== Spread: left aligned ====== */
+  #spread{display:grid; justify-content:start; align-items:start; min-height:240px; gap:10px}
+  .slot{width:var(--card-w); height:var(--card-h);
+        border:1px dashed #33496c; border-radius:10px; display:flex; align-items:center; justify-content:center;
+        color:#6a86b1; font-size:12px; padding:4px; position:relative; text-align:center}
+  .pos-label{position:absolute; top:-18px; left:0; right:0; text-align:center; color:#9fb4d8; font-size:11px}
+  .spread-10{grid-template-columns:repeat(6,var(--card-w)); grid-auto-rows:var(--card-h); gap:12px}
 
   /* Celtic Cross overlay */
-  .cc-center{position:relative;width:var(--card-w);height:var(--card-h);display:grid;place-items:center}
-  .cc-pos1,.cc-pos2{position:absolute;width:var(--card-w);height:var(--card-h)}
-  .cc-pos2{transform:rotate(90deg) translateY(6px);transform-origin:center;z-index:2}
+  .cc-center{position:relative; width:var(--card-w); height:var(--card-h); display:grid; place-items:center}
+  .cc-pos1,.cc-pos2{position:absolute; width:var(--card-w); height:var(--card-h)}
+  .cc-pos2{transform:rotate(90deg) translateY(6px); transform-origin:center; z-index:2}
 
-  /* AI panel */
+  /* AI */
   #aiAnswer.loading{opacity:.7}
+
+  @media (max-width:600px){
+    header{gap:8px}
+    .list{max-height:120px}
+  }
 </style>
 </head>
 <body>
@@ -71,85 +111,88 @@
     </label>
     <button id="btnShuffle" class="primary">🔀 Shuffle／洗牌</button>
     <button id="btnReset">♻️ Reset／重設</button>
-    <button id="btnLoadMap" class="primary">📦 Load Map (embedded-images.js / images.json)</button>
+    <!-- Hidden loader (you can inline EMDEDDED_IMAGES below) -->
+    <button id="btnLoadMap" class="primary" style="display:none">📦 Load Map</button>
     <span id="status" class="status"></span>
   </div>
 </header>
 
 <main>
-  <!-- 1) Pool -->
+  <!-- 1) Question + AI ABOVE the pool -->
+  <section id="ai">
+    <h2>Question & AI Reading（Tarot）／問題與 AI 解讀（塔羅）</h2>
+    <div class="legend">抽齊牌後按「Ask AI」。Poe API 需要 Poe API Key（自動儲存於此裝置）。</div>
+    <div class="controls" style="margin-top:8px;gap:10px;align-items:flex-start">
+      <textarea id="userQ" rows="3" placeholder="Type your question／請輸入你的問題" style="flex:1;min-width:240px"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:300px">
+        <label>Provider
+          <select id="aiProvider">
+            <option value="local" selected>Offline (no API)／離線</option>
+            <option value="poe">Poe API（OpenAI‑compatible）</option>
+          </select>
+        </label>
+        <label>Poe API Key
+          <input id="aiKey" type="password" placeholder="sk_... from https://poe.com/api_key (auto-saved)"/>
+        </label>
+        <label>Model/Bot
+          <input id="aiModel" type="text" value="Assistant"/>
+        </label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button id="btnAskAI" class="primary" disabled>🤖 Ask AI</button>
+          <span id="aiStatus" class="status"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="aiAnswer" class="legend" style="white-space:pre-wrap;margin-top:10px"></div>
+
+    <!-- Prompt preview -->
+    <div id="aiPromptWrap" class="legend" style="margin-top:10px">
+      <details open>
+        <summary>Prompt sent to Assistant ／ 傳送到 AI 的提示</summary>
+        <pre id="aiPrompt" class="list" style="white-space:pre-wrap; margin-top:6px"></pre>
+        <div class="controls" style="margin-top:6px"><button id="btnCopyPrompt">📋 Copy Prompt</button></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 2) Pool: single row scroller -->
   <section>
-    <h2 id="poolTitle">Shuffled Pool／洗好嘅牌庫（點擊逐張揀）</h2>
+    <h2 id="poolTitle">Shuffled Pool／洗好嘅牌庫（橫向滑動，點擊抽牌）</h2>
     <div id="poolWrap">
       <div id="poolRows">
         <div class="poolRow" id="poolRow1"></div>
-        <div class="poolRow" id="poolRow2"></div>
-        <div class="poolRow" id="poolRow3"></div>
       </div>
     </div>
     <details><summary>Missing／未找到清單</summary><div id="missing" class="list">(none／沒有)</div></details>
   </section>
 
-  <!-- 2) Spread -->
+  <!-- 3) Spread -->
   <section>
     <h2 id="spreadTitle">Your Spread／你的牌陣</h2>
     <div id="spread" class="spread-10"></div>
     <div class="legend" id="spreadHelp"></div>
   </section>
 
-  <!-- 3) Summary -->
+  <!-- 4) Summary -->
   <section id="summary">
     <h2>Summary／解讀摘要</h2>
     <div id="summaryBody" class="legend">Draw cards to see the reading here.／抽完牌後會顯示總結。</div>
   </section>
 
-  <!-- 4) Question + AI -->
-  <section id="ai">
-    <h2>Question & AI Reading／問題與 AI 解讀</h2>
-    <div class="legend">輸入你的問題；抽齊牌後可按「Ask AI」。<br>「Poe」模式需要 API Key（<a href="https://poe.com/api_key" target="_blank" rel="noopener">poe.com/api_key</a>）。</div>
-    <div class="controls" style="margin-top:8px;gap:10px;align-items:flex-start">
-      <textarea id="userQ" rows="3" placeholder="Type your question／請輸入你的問題" style="flex:1;min-width:280px"></textarea>
-      <div style="display:flex;flex-direction:column;gap:6px;min-width:280px">
-        <label>Provider
-          <select id="aiProvider">
-            <option value="local" selected>Offline (no API)／離線</option>
-            <option value="poe">Poe API (OpenAI‑compatible)／需 API Key</option>
-          </select>
-        </label>
-        <label>API Key <input id="aiKey" type="password" placeholder="(leave blank for Offline)" autocomplete="off" text="dGteuQLkWyAb3pJ4dDP_20mGHXX8CCgqpXoL8yIdwu0"/></label>
-        <label>Model/Bot <input id="aiModel" type="text" value="Assistant"/></label>
-        <button id="btnAskAI" class="primary" disabled>🤖 Ask AI</button>
-        <span id="aiStatus" class="status"></span>
-      </div>
-    </div>
-	
-	<!-- Prompt preview -->
-	<div id="aiPromptWrap" class="legend" style="margin-top:10px">
-	  <details open>
-		<summary>Prompt sent to Assistant ／ 傳送到 AI 的提示</summary>
-		<pre id="aiPrompt" class="list" style="white-space:pre-wrap; margin-top:6px"></pre>
-		<div class="controls" style="margin-top:6px">
-		  <button id="btnCopyPrompt">📋 Copy Prompt</button>
-		</div>
-	  </details>
-	</div>
-
-    <div id="aiAnswer" class="legend" style="white-space:pre-wrap;margin-top:10px"></div>
-  </section>
-
-  <!-- 5) Map Loader (optional true single-file: paste your map below instead) -->
-  <section hidden="true">
+  <!-- 5) (Hidden) Map Loader -->
+  <section hidden>
     <h2>Image Map／圖片映射</h2>
-    <div class="legend">此處可載入 <code>embedded-images.js</code> 或 <code>images.json</code>；或把 JSON 直接貼到下方 script 區塊。</div>
+    <div class="legend">可載入 <code>embedded-images.js</code> 或 <code>images.json</code>；或把 JSON 直接貼到下方 script 區塊。</div>
     <div class="controls" style="gap:8px">
       <input type="file" id="fileMap" accept=".js,.json,application/json,text/javascript" style="display:none"/>
-      <button id="btnSelectFile">Select file…／選擇檔案</button>
+      <button id="btnSelectFile" style="display:none">Select file…／選擇檔案</button>
     </div>
     <div class="list" id="loadedKeys">(none)</div>
   </section>
 </main>
 
-<!-- A) Card back (simple SVG; replace with your patterned Data URL if you like) -->
+<!-- Card back (simple SVG) -->
 <script>
 var CARD_BACK_DATA_URL = "data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' width='220' height='360'>\
@@ -161,9 +204,6 @@ var CARD_BACK_DATA_URL = "data:image/svg+xml;utf8,\
 </g></svg>";
 </script>
 
-<!-- B) (Optional) Paste your embedded image map here for true one-file usage
-<script>window.EMBEDDED_IMAGES = { ... };</script>
--->
 <script>
 // EITHER paste: window.EMBEDDED_IMAGES = { ... };
 // OR:            const EMBEDDED_IMAGES = { ... };
@@ -172,47 +212,39 @@ window.EMBEDDED_IMAGES = {"cups01":"data:image/webp;base64,UklGRm44AABXRUJQVlA4W
 </script>
 
 <script>
-/* =========================
-   iOS-safe helpers & shims
-========================= */
+/* iOS-safe small shims */
 (function(){ if(!String.prototype.replaceAll){ String.prototype.replaceAll=function(s,r){ return this.split(s).join(r); }; }})();
 function decodeEntities(s){ return String(s).replace(/&amp;/g,'&'); }
+</script>
 
-/* =========================
-   I18N (uses your fixed labels)
-========================= */
-var I18N = {
-  en:{ poolTitle:"Shuffled Pool (click to draw)", spreadTitle:"Your Spread",
-       help:{ "1":"Draw one card for a concise message.","3":"Classic three-card read: Past → Present → Future.",
-              "10":"Celtic Cross layout—draw 10 cards in order. Cards 1–6 form the cross; 7–10 the staff." } },
-  zh:{ poolTitle:"洗好嘅牌庫（點擊逐張揀）", spreadTitle:"你的牌陣",
-       help:{ "1":"抽一張牌作為簡潔訊息。","3":"三張牌：過去 → 現在 → 未來。","10":"十字陣：依次抽10張。1–6 為十字，7–10 為杖。"} }
-};
-var LANG = 'en';
+<script>
+/* ===== I18N & Spreads ===== */
+var I18N={en:{poolTitle:"Shuffled Pool (swipe horizontally to draw)",spreadTitle:"Your Spread",
+  help:{"1":"Draw one card for a concise message.","3":"Classic three-card read: Past → Present → Future.","10":"Celtic Cross — draw 10 in order (1–6 cross; 7–10 staff).","choice5":"Two choices & outcomes (5): A-state, B-state, A-outcome, B-outcome, Querent"}},
+  zh:{poolTitle:"洗好嘅牌庫（橫向滑動抽牌）",spreadTitle:"你的牌陣",
+  help:{"1":"抽一張牌作為簡潔訊息。","3":"三張牌：過去 → 現在 → 未來。","10":"十字陣：1–6 為十字，7–10 為杖。","choice5":"五張牌｜二選一＆可能的結果：選項A狀態、選項B狀態、A結果、B結果、當事人狀態。"}}};
+var LANG='en';
 
-/* =========================
-   Spreads catalog
-========================= */
-var SPREADS = {
-  "1":   { key:"1",   labelEn:"Single Insight (1)",           labelZh:"單張指引（1）",
-           posEn:["Insight"], posZh:["指引"], layout:{columns:1} },
-  "3":   { key:"3",   labelEn:"Past–Present–Future (3)",      labelZh:"過去－現在－未來（3）",
-           posEn:["Past","Present","Future"], posZh:["過去","現在","未來"], layout:{columns:3} },
-  "10":  { key:"10",  labelEn:"Celtic Cross (10)",            labelZh:"十字陣（10）",
-           posEn:["You / Heart","Challenge","Foundation","Past","Conscious","Near Future","Self","Environment","Hopes & Fears","Outcome"],
-           posZh:["你本人／核心","障礙／衝突","根基／內在","過去／已發生","願景／意識","近期／將臨","自我／態度","周遭／環境","希望與恐懼","結果／走向"],
-           layout:{type:"celtic"} },
-  "love6": { key:"love6", labelEn:"Love Relationship (6)",    labelZh:"感情關係（6）",
-           posEn:["You","Partner","Relationship","Strengths","Challenges","Outcome"],
-           posZh:["你","對方","關係本質","優勢","挑戰","結果"], layout:{columns:3} },
-  "future7":{ key:"future7", labelEn:"Horseshoe Future (7)",  labelZh:"馬蹄未來（7）",
-           posEn:["Past","Present","Hidden Influences","Obstacles","Advice","External Attitudes","Outcome"],
-           posZh:["過去","現在","隱藏影響","障礙","建議","外界看法","結果"], layout:{columns:4} }
+/* New spread: 五張牌｜二選一＆可能的結果 */
+var SPREADS={
+ "1":{key:"1",labelEn:"Single Insight (1)",labelZh:"單張指引（1）",posEn:["Insight"],posZh:["指引"],layout:{columns:1}},
+ "3":{key:"3",labelEn:"Past–Present–Future (3)",labelZh:"過去－現在－未來（3）",posEn:["Past","Present","Future"],posZh:["過去","現在","未來"],layout:{columns:3}},
+ "10":{key:"10",labelEn:"Celtic Cross (10)",labelZh:"十字陣（10）",
+   posEn:["You / Heart","Challenge","Foundation","Past","Conscious","Near Future","Self","Environment","Hopes & Fears","Outcome"],
+   posZh:["你本人／核心","障礙／衝突","根基／內在","過去／已發生","願景／意識","近期／將臨","自我／態度","周遭／環境","希望與恐懼","結果／走向"],
+   layout:{type:"celtic"}},
+ "choice5":{key:"choice5",labelEn:"Either/Or + Outcomes (5)",labelZh:"五張牌｜二選一＆可能的結果（5）",
+   posEn:["Option A — State","Option B — State","Option A — Outcome","Option B — Outcome","Querent — State"],
+   posZh:["選項A的狀態","選項B的狀態","選項A可能的結果","選項B可能的結果","當事人的狀態"],
+   layout:{columns:5}},
+ "love6":{key:"love6",labelEn:"Love Relationship (6)",labelZh:"感情關係（6）",
+   posEn:["You","Partner","Relationship","Strengths","Challenges","Outcome"], posZh:["你","對方","關係本質","優勢","挑戰","結果"], layout:{columns:3}},
+ "future7":{key:"future7",labelEn:"Horseshoe Future (7)",labelZh:"馬蹄未來（7）",
+   posEn:["Past","Present","Hidden Influences","Obstacles","Advice","External Attitudes","Outcome"],
+   posZh:["過去","現在","隱藏影響","障礙","建議","外界看法","結果"], layout:{columns:4}}
 };
 
-/* =========================
-   Bilingual concise meanings
-========================= */
+/* ===== Meanings (paste your full block here if you want text explanations) ===== */
 var MEANINGS = {
   major:{
     0:{u:{en:"new journey, innocence, leap of faith", zh:"新的旅程・純真・信念一躍"},
@@ -282,37 +314,30 @@ var MEANINGS = {
   }
 };
 
-/* =========================
-   State & deck
-========================= */
+
+/* ===== State & deck ===== */
 var MAJOR_BASES=["RWS_Tarot_00_Fool","RWS_Tarot_01_Magician","RWS_Tarot_02_High_Priestess","RWS_Tarot_03_Empress","RWS_Tarot_04_Emperor","RWS_Tarot_05_Hierophant","RWS_Tarot_06_Lovers","RWS_Tarot_07_Chariot","RWS_Tarot_08_Strength","RWS_Tarot_09_Hermit","RWS_Tarot_10_Wheel_of_Fortune","RWS_Tarot_11_Justice","RWS_Tarot_12_Hanged_Man","RWS_Tarot_13_Death","RWS_Tarot_14_Temperance","RWS_Tarot_15_Devil","RWS_Tarot_16_Tower","RWS_Tarot_17_Star","RWS_Tarot_18_Moon","RWS_Tarot_19_Sun","RWS_Tarot_20_Judgement","RWS_Tarot_21_World"];
 var SUITS=["Wands","Cups","Swords","Pentacles"];
 var statusEl=document.getElementById('status'), missingEl=document.getElementById('missing'), summaryEl=document.getElementById('summaryBody');
-var IMAGE_MAP={};  // key -> dataURL (loaded)
-var state={ deck:[], pool:[], spreadType:"3", drawn:[] };
+var IMAGE_MAP={}, state={ deck:[], pool:[], spreadType:"3", drawn:[] };
 
-/* spread utils */
+/* utils & lock */
 function getNeededCount(key){ var s=SPREADS[key||state.spreadType]; return (s&&s.posEn)?s.posEn.length:0; }
-function lockPoolIfFull(){ var need=getNeededCount(); var wrap=document.getElementById('poolWrap'); if(!wrap) return; wrap.setAttribute('data-locked', (state.drawn.length>=need)?'true':'false'); }
+function lockPoolIfFull(){ var need=getNeededCount(); var wrap=document.getElementById('poolWrap'); if(!wrap) return; wrap.setAttribute('data-locked',(state.drawn.length>=need)?'true':'false'); }
 function unlockPool(){ var wrap=document.getElementById('poolWrap'); if(!wrap) return; wrap.setAttribute('data-locked','false'); }
 
-/* map loading (file) */
-function updateStatus(){ var need=78, have=Object.keys(IMAGE_MAP).length;
-  statusEl.innerHTML = '<span class="'+(have===need?'ok':(have>0?'warn':'err'))+'">Loaded '+have+'/'+need+'</span>';
-  var loadedKeys=document.getElementById('loadedKeys'); if(loadedKeys){ loadedKeys.textContent = have? Object.keys(IMAGE_MAP).sort().join('\n') : '(none)'; }
+/* map loading */
+function updateStatus(){ var need=78, have=Object.keys(IMAGE_MAP).length; var loadedKeys=document.getElementById('loadedKeys');
+  statusEl.innerHTML='<span class="'+(have===need?'ok':(have>0?'warn':'err'))+'">Loaded '+have+'/'+need+'</span>';
+  if(loadedKeys) loadedKeys.textContent = have? Object.keys(IMAGE_MAP).sort().join('\n') : '(none)';
 }
 function listMissing(){ var loaded=new Set(Object.keys(IMAGE_MAP)); var all=expectedKeys(); var miss=[]; for(var i=0;i<all.length;i++) if(!loaded.has(all[i])) miss.push(all[i]); missingEl.textContent = miss.length? miss.join('\n') : '(none／沒有)'; }
 function expectedKeys(){ var out=[].concat(MAJOR_BASES); for(var s=0;s<SUITS.length;s++){ for(var r=1;r<=14;r++){ var n=('0'+r).slice(-2); var key=(SUITS[s]==='Pentacles'?'pents':SUITS[s].toLowerCase())+n; out.push(key); } } return out; }
 function ingestMapFile(file){
   var r=new FileReader(); r.onload=function(){
-    try{
-      var text=r.result, obj=null;
-      try{ obj=JSON.parse(text); }catch(e){
-        var a=text.indexOf('{'), b=text.lastIndexOf('}');
-        if(a>=0 && b>a){ obj=JSON.parse(text.slice(a,b+1)); }
-      }
-      if(!obj) throw new Error('Unrecognized file');
-      IMAGE_MAP=obj; updateStatus(); listMissing(); buildDeck(); resetReading();
+    try{ var text=r.result, obj=null;
+      try{ obj=JSON.parse(text); }catch(e){ var a=text.indexOf('{'),b=text.lastIndexOf('}'); if(a>=0&&b>a){ obj=JSON.parse(text.slice(a,b+1)); } }
+      if(!obj) throw new Error('Unrecognized file'); IMAGE_MAP=obj; updateStatus(); listMissing(); buildDeck(); resetReading();
     }catch(e){ alert('Load failed: '+e.message); }
   }; r.readAsText(file);
 }
@@ -326,13 +351,13 @@ function buildDeck(){
     deck.push({ id:'M'+('0'+i).slice(-2), arcana:'major', num:i, enName:en, zhName:zh, img:img });
   }
   var enRank=enRanks(), zhRank=zhRanks(), suitEN=suitEn(), suitZH=suitZh();
-  for(var si=0; si<SUITS.length; si++){
+  for(var si=0;si<SUITS.length;si++){
     var suit=SUITS[si];
     for(var r=1;r<=14;r++){
       var n=('0'+r).slice(-2), key=(suit==='Pentacles'?'pents':suit.toLowerCase())+n, img2=IMAGE_MAP[key];
       if(!img2) missing.push(key);
       deck.push({ id:'m_'+suit+'_'+n, arcana:'minor', suit:suit, rank:r,
-                  enName:(enRank[r]+' of '+suitEN[suit]), zhName:(suitZH[suit]+zhRank[r]), img:img2 });
+        enName:(enRank[r]+' of '+suitEN[suit]), zhName:(suitZH[suit]+zhRank[r]), img:img2 });
     }
   }
   state.deck=deck; missingEl.textContent = missing.length? Array.from(new Set(missing)).join('\n') : '(none／沒有)';
@@ -344,19 +369,28 @@ function zhRanks(){ return {1:"一",2:"二",3:"三",4:"四",5:"五",6:"六",7:"�
 function suitEn(){ return {Wands:"Wands", Cups:"Cups", Swords:"Swords", Pentacles:"Pentacles"}; }
 function suitZh(){ return {Wands:"權杖", Cups:"聖杯", Swords:"寶劍", Pentacles:"星幣"}; }
 
-/* pool + spread rendering */
-function cardBackEl(card){ var el=document.createElement('div'); el.className='card'; el.title=(LANG==='en'?'Pick a card':'揀一張牌');
-  var face=document.createElement('div'); face.className='face'; var img=new Image(); img.loading='lazy'; img.decoding='async'; img.src=CARD_BACK_DATA_URL; img.alt='Card back';
-  face.appendChild(img); el.appendChild(face); el.addEventListener('click', function(){ onChooseFromPool(card.id); }); return el; }
-function cardFrontEl(card){ var el=document.createElement('div'); el.className='card'; if(card.reversed) el.classList.add('reversed');
-  var face=document.createElement('div'); face.className='face'; var img=new Image(); img.loading='lazy'; img.decoding='async'; img.src=card.img||''; img.alt=(LANG==='en'?card.enName:card.zhName);
-  face.appendChild(img); el.appendChild(face); var cap=document.createElement('div'); cap.className='caption'; cap.textContent=(LANG==='en'?card.enName:card.zhName); el.appendChild(cap); return el; }
-function renderPoolBacks(){
-  var r1=document.getElementById('poolRow1'), r2=document.getElementById('poolRow2'), r3=document.getElementById('poolRow3'); r1.innerHTML=r2.innerHTML=r3.innerHTML='';
-  for(var i=0;i<state.pool.length;i++){
-    var el=cardBackEl(state.pool[i]); if(i%3===0) r1.appendChild(el); else if(i%3===1) r2.appendChild(el); else r3.appendChild(el);
-  }
+/* pool + spread rendering (SINGLE row in #poolRow1) */
+function cardBackEl(card){
+  var el=document.createElement('div'); el.className='card'; el.title=(LANG==='en'?'Pick a card':'揀一張牌');
+  var face=document.createElement('div'); face.className='face';
+  var img=new Image(); img.loading='lazy'; img.decoding='async'; img.src=CARD_BACK_DATA_URL; img.alt='Card back';
+  face.appendChild(img); el.appendChild(face);
+
+  /* CLICK TO CHOOSE (bug fix: rely on native click only, no pointer-capture) */
+  el.addEventListener('click', function(){ onChooseFromPool(card.id); });
+  return el;
 }
+function cardFrontEl(card){
+  var el=document.createElement('div'); el.className='card'; if(card.reversed) el.classList.add('reversed');
+  var face=document.createElement('div'); face.className='face'; var img=new Image(); img.loading='lazy'; img.decoding='async'; img.src=card.img||''; img.alt=(LANG==='en'?card.enName:card.zhName);
+  face.appendChild(img); el.appendChild(face); var cap=document.createElement('div'); cap.className='caption'; cap.textContent=(LANG==='en'?card.enName:card.zhName); el.appendChild(cap); return el;
+}
+function renderPoolBacks(){
+  var r1=document.getElementById('poolRow1'); r1.innerHTML='';
+  for(var i=0;i<state.pool.length;i++){ r1.appendChild(cardBackEl(state.pool[i])); }
+}
+
+/* Spread */
 function buildSpreadSlots(){
   var c=document.getElementById('spread'); c.className='spread-10'; c.innerHTML='';
   var s=SPREADS[state.spreadType] || SPREADS["3"];
@@ -374,142 +408,206 @@ function buildSpreadSlots(){
     place(makeSlot(7),6,1); place(makeSlot(8),6,2); place(makeSlot(9),6,3); place(makeSlot(10),6,4);
     c.appendChild(frag); return;
   }
-  var cols = (s.layout && s.layout.columns) ? s.layout.columns : ((s.posEn && s.posEn.length) || 1);
+  var cols=(s.layout && s.layout.columns)? s.layout.columns : ((s.posEn && s.posEn.length) || 1);
   c.style.gridTemplateColumns='repeat('+cols+', var(--card-w))';
   var pos=(LANG==='zh'?s.posZh:s.posEn) || [];
   for(var i=0;i<pos.length;i++){ var slot=document.createElement('div'); slot.className='slot';
     var label=document.createElement('div'); label.className='pos-label'; label.textContent=decodeEntities(pos[i]||('#'+(i+1)));
-    slot.appendChild(label); var cd=state.drawn[i]; if(cd) slot.appendChild(cardFrontEl(cd)); c.appendChild(slot);
+    slot.appendChild(label); var cd=state.drawn[i]; if(cd) slot.appendChild(cardFrontEl(cd)); c.appendChild(slot); }
+}
+
+/* meanings + summary (stub if you didn't paste MEANINGS) */
+/* Helper: safely get a value from possible keys */
+function pickFrom(obj, candidates){
+  if(!obj) return null;
+  for(var i=0;i<candidates.length;i++){
+    var k = candidates[i];
+    if(k!=null){
+      if(obj[k]!=null) return obj[k];
+      // also try normalized string keys
+      var ks = String(k);
+      if(obj[ks]!=null) return obj[ks];
+    }
+  }
+  return null;
+}
+
+/* Fallback themes (used when MEANINGS doesn't have an explicit entry) */
+var __SUIT_THEMES__ = {
+  Wands:{en:"action, drive, initiative", zh:"行動、推動、主動"},
+  Cups:{en:"emotion, bonds, intuition", zh:"情感、連結、直覺"},
+  Swords:{en:"logic, truth, conflict", zh:"理性、真相、衝突"},
+  Pentacles:{en:"material, work, stability", zh:"物質、工作、穩定"}
+};
+var __RANK_HINTS__ = {
+  1:{en:"seed/new spark", zh:"種子／新火花"},
+  2:{en:"choice/balance", zh:"抉擇／平衡"},
+  3:{en:"growth/teamwork", zh:"成長／協作"},
+  4:{en:"structure/rest", zh:"結構／休整"},
+  5:{en:"tests/competition", zh:"考驗／競爭"},
+  6:{en:"progress/victory", zh:"進展／勝利"},
+  7:{en:"challenge/assessment", zh:"挑戰／評估"},
+  8:{en:"movement/skill", zh:"流動／技藝"},
+  9:{en:"strain/persistence", zh:"壓力／堅持"},
+  10:{en:"culmination/burden", zh:"圓滿／負擔"},
+  11:{en:"curiosity/message", zh:"好奇／訊息"},     // Page
+  12:{en:"pursuit/change", zh:"追求／變動"},        // Knight
+  13:{en:"maturity/compassion", zh:"成熟／關懷"},  // Queen
+  14:{en:"authority/mastery", zh:"權威／掌控"}     // King
+};
+
+function meaningForCard(card, lang){
+  var Lzh = (lang==='zh');
+
+  // ---- 1) Try explicit MEANINGS, if present
+  var M = (window.MEANINGS || {});
+  var keyCandidates = [
+    card.id,                 // e.g. "M00", "m_Wands_01"
+    card.enName,             // "II The High Priestess", "Ace of Wands"
+    card.zhName,             // "女祭司", "權杖一"
+    (card.arcana==='major'? String(card.num): null), // "0".."21"
+    (card.arcana==='minor' && card.suit ? (card.suit + '_' + card.rank): null)
+  ];
+
+  function extractText(rec){
+    if(!rec) return null;
+    // Prioritize current language fields
+    var txt = null;
+    if(Lzh){
+      txt = rec.zh || rec.uprightZh || rec.cn || rec.tc || rec.sc;
+      if(!txt) txt = rec.upright || rec.en;
+    }else{
+      txt = rec.en || rec.upright || rec.zh || rec.uprightZh;
+    }
+    // If reversed and alt provided
+    if(card.reversed){
+      var rev = (Lzh ? (rec.reversedZh || rec.revZh || rec.zhRev) : (rec.reversed || rec.rev || rec.enRev));
+      if(rev) txt = rev;
+    }
+    return txt;
+  }
+
+  // majors
+  if(card.arcana==='major'){
+    var rec = null;
+    if(M.majors) rec = pickFrom(M.majors, keyCandidates);
+    if(!rec)     rec = pickFrom(M,       keyCandidates); // flat mapping fallback
+    var t = extractText(rec);
+    if(t) return t;
+  }
+  // minors
+  else{
+    var mrec = null;
+    if(M.minors){
+      // minors can be nested: minors[suit][rank] or keyed flat
+      var nest = M.minors[card.suit];
+      if(nest) mrec = pickFrom(nest, [card.rank, String(card.rank)]);
+      if(!mrec) mrec = pickFrom(M.minors, keyCandidates);
+    }
+    if(!mrec) mrec = pickFrom(M, keyCandidates); // flat fallback
+    var t2 = extractText(mrec);
+    if(t2) return t2;
+  }
+
+  // ---- 2) Fallback: compose a compact meaning (always returns something)
+  if(card.arcana==='major'){
+    var title = (Lzh ? majorZH(card.num) : majorEN(card.num));
+    return Lzh
+      ? (title + "：以大牌能量主導此位；" + (card.reversed?"逆位＝阻滯或內化":"正位＝順流與清晰") + "。")
+      : (title + ": Major Arcana dominates this position; " + (card.reversed?"Reversed = blockage/internalization":"Upright = flow/clarity") + ".");
+  }else{
+    var st = __SUIT_THEMES__[card.suit] || {en:"", zh:""};
+    var rk = __RANK_HINTS__[card.rank]   || {en:"", zh:""};
+    return Lzh
+      ? ("主題："+st.zh+"；重點："+rk.zh+"。"+(card.reversed?"（逆位：能量內縮、延誤或偏差）":"（正位：能量順行、可行與清晰）"))
+      : ("Theme: "+st.en+"; Focus: "+rk.en+". "+(card.reversed?"(Reversed: internalized, delay or misalignment)":"(Upright: flowing, feasible, clear)"));
   }
 }
 
-/* summary */
-function meaningForCard(card, lang){
-  var L=(lang==='zh'?'zh':'en');
-  if(card.arcana==='major'){
-    var m=MEANINGS.major[card.num]; if(!m) return "";
-    var bucket= card.reversed? m.r : m.u;
-    if(typeof bucket==='string') return bucket;
-    return (bucket && bucket[L]) || (bucket && bucket.en) || "";
-  }else{
-    var theme = (MEANINGS.suitTheme[L]||MEANINGS.suitTheme.en)[card.suit];
-    var r = MEANINGS.rank[card.rank]; if(!theme||!r) return "";
-    if(L==='zh'){ var t= card.reversed? r.zhR : r.zhU; if(t) return t.replace("{suit}", theme);
-      var enT= card.reversed? (r.r&&r.r.en) : (r.u&&r.u.en); return (enT||"").replace("{suit}", theme);
-    }else{ var enT2= card.reversed? (r.r&&r.r.en) : (r.u&&r.u.en); return (enT2||"").replace("{suit}", theme); }
-  }
-}
 function renderSummary(){
   var s=SPREADS[state.spreadType] || SPREADS["3"]; var posNames=(LANG==='zh'?s.posZh:s.posEn)||[];
   var target=document.getElementById('summaryBody'); if(!state.drawn.length){ target.textContent=(LANG==='en'?"Draw cards to see the reading here.":"抽完牌後會顯示總結。"); return; }
   var lines=[], total=Math.min(state.drawn.length, posNames.length||state.drawn.length);
-  for(var i=0;i<total;i++){
-    var cd=state.drawn[i], pos=decodeEntities(posNames[i]||('#'+(i+1)));
-    var name=(LANG==='zh'?cd.zhName:cd.enName); var ori=cd.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright");
-    var expl=meaningForCard(cd, LANG)||"";
-    lines.push('<div class="cardline"><span class="pos">'+pos+'</span> — <span class="name">'+name+'</span> <span class="ori">('+ori+')</span><br/><span class="meaning">• '+expl+'</span></div>');
-  }
+  for(var i=0;i<total;i++){ var cd=state.drawn[i], pos=decodeEntities(posNames[i]||('#'+(i+1))); var name=(LANG==='zh'?cd.zhName:cd.enName); var ori=cd.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright"); var expl=meaningForCard(cd, LANG)||"";
+    lines.push('<div class="cardline"><span class="pos">'+pos+'</span> — <span class="name">'+name+'</span> <span class="ori">('+ori+')</span><br/><span class="meaning">• '+expl+'</span></div>'); }
   var need=getNeededCount(); var remain=Math.max(0, need - state.drawn.length);
   if(remain>0){ lines.push('<div class="legend" style="margin-top:8px">'+(LANG==='en'?('Draw '+remain+' more to complete the spread.'):('仍需再抽 '+remain+' 張完成牌陣。'))+'</div>'); }
   target.innerHTML=lines.join("");
 }
 
 /* interactions */
-function shuffleDeck(){ state.pool=[].concat(state.deck); for(var i=state.pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=state.pool[i]; state.pool[i]=state.pool[j]; state.pool[j]=t; } renderPoolBacks(); }
+function shuffleDeck(){
+  state.pool=[].concat(state.deck);
+  for(var i=state.pool.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=state.pool[i]; state.pool[i]=state.pool[j]; state.pool[j]=t; }
+  renderPoolBacks();
+}
 function resetReading(){ state.drawn=[]; shuffleDeck(); buildSpreadSlots(); renderSummary(); renderPoolBacks(); unlockPool(); updateAIControls(); }
 function applySpread(k){ state.spreadType=k; state.drawn=[]; updateSpreadHelp(); buildSpreadSlots(); renderSummary(); renderPoolBacks(); unlockPool(); updateAIControls(); }
 function onChooseFromPool(cardId){
   var need=getNeededCount(); if(state.drawn.length>=need) return;
-  var idx=-1; for(var i=0;i<state.pool.length;i++){ if(state.pool[i].id===cardId){ idx=i; break; } }
-  if(idx===-1) return;
+  var idx=-1; for(var i=0;i<state.pool.length;i++){ if(state.pool[i].id===cardId){ idx=i; break; } } if(idx===-1) return;
   var card=state.pool.splice(idx,1)[0]; card.reversed=Math.random()<0.5; state.drawn.push(card);
   renderPoolBacks(); buildSpreadSlots(); renderSummary(); lockPoolIfFull(); updateAIControls();
 }
 
 /* i18n wire */
-function setLanguage(lang){
-  LANG=lang; document.getElementById('poolTitle').textContent=I18N[lang].poolTitle;
-  document.getElementById('spreadTitle').textContent=I18N[lang].spreadTitle;
-  updateSpreadHelp(); buildSpreadSlots(); renderSummary(); renderPoolBacks();
-}
+function setLanguage(lang){ LANG=lang; document.getElementById('poolTitle').textContent=I18N[lang].poolTitle; document.getElementById('spreadTitle').textContent=I18N[lang].spreadTitle;
+  updateSpreadHelp(); buildSpreadSlots(); renderSummary(); renderPoolBacks(); }
 function updateSpreadHelp(){
-  var k=state.spreadType; var t="";
+  var k=state.spreadType, t="";
   if(k==="1"){ t=(LANG==='en'?"Draw one card as a concise message.":"抽一張牌作為簡潔訊息。"); }
   else if(k==="3"){ t=(LANG==='en'?"Classic three-card read: Past → Present → Future.":"三張牌：過去 → 現在 → 未來。"); }
   else if(k==="10"){ t=(LANG==='en'?"Celtic Cross: positions 1–6 cross, 7–10 staff.":"十字陣：1–6 為十字，7–10 為杖。"); }
+  else if(k==="choice5"){ t=(LANG==='en'?"Two choices & outcomes: A-state, B-state, A-outcome, B-outcome, Querent.":"二選一＆可能結果：A狀態、B狀態、A結果、B結果、當事人狀態。"); }
   else if(k==="love6"){ t=(LANG==='en'?"Love focus: You–Partner–Relationship–Strengths–Challenges–Outcome.":"感情重點：你－對方－關係－優勢－挑戰－結果。"); }
   else if(k==="future7"){ t=(LANG==='en'?"Horseshoe: Past→Present→Hidden→Obstacles→Advice→External→Outcome.":"馬蹄陣：過去→現在→隱藏→障礙→建議→外界→結果。"); }
   document.getElementById('spreadHelp').textContent=t;
 }
-
-/* dropdown & file buttons */
 function populateSpreadSelect(){
-  var sel=document.getElementById('spreadSelect'); var order=["1","3","10","love6","future7"]; sel.innerHTML="";
+  var sel=document.getElementById('spreadSelect'); var order=["1","3","choice5","love6","future7","10"]; sel.innerHTML="";
   for(var i=0;i<order.length;i++){ var k=order[i], sp=SPREADS[k], opt=document.createElement('option'); opt.value=k; opt.textContent=(LANG==='en'?sp.labelEn:sp.labelZh); sel.appendChild(opt); }
   sel.value = SPREADS[state.spreadType] ? state.spreadType : "3";
 }
 
-/* AI panel */
-function updateAIControls(){ var askBtn=document.getElementById('btnAskAI'); var need=getNeededCount(); var ready=state.drawn && state.drawn.length>=need && need>0; if(askBtn) askBtn.disabled=!ready; }
-
+/* ===== AI: Tarot prompt builder ===== */
 function buildReadingPrompt(){
-  var s = SPREADS[state.spreadType] || SPREADS["3"];
-  var pos = (LANG==='zh' ? s.posZh : s.posEn) || [];
-  var q   = (document.getElementById('userQ').value || '').trim();
-  var lines = [];
-
-  // ① Identity + task + Tarot context
-  lines.push(LANG==='zh'
-    ? "你是一位理解瑞德偉特（RWS）塔羅的直覺式占卜師，請依據下列牌陣提供清晰、務實的解讀。"
-    : "You are an intuitive tarot reader versed in Rider–Waite–Smith. Use the spread below and give a clear, practical reading.");
-
-  // ② Explicit Tarot instruction + explanations requested
-  lines.push(LANG==='zh'
-    ? "我們正以塔羅占卜來「開」此問題：請逐一對應每個牌位與牌義，說明原因與意涵，並把正/逆位的象徵轉化為具體說明與建議。"
-    : "We are using a Tarot spread to open this question: for each position, map the card to its meaning, explain why it matters, and translate upright/reversed symbolism into concrete explanations and advice.");
-
-  // ③ User question
-  if (q){
-    lines.push( (LANG==='zh' ? "問題：" : "Question: ") + q );
+  var s=SPREADS[state.spreadType] || SPREADS["3"]; var pos=(LANG==='zh'?s.posZh:s.posEn)||[]; var q=(document.getElementById('userQ').value||'').trim(); var lines=[];
+  lines.push(LANG==='zh'?"你是一位理解瑞德偉特（RWS）塔羅的直覺式占卜師，請依據下列牌陣提供清晰、務實的解讀。":"You are an intuitive tarot reader versed in Rider–Waite–Smith. Use the spread below and give a clear, practical reading.");
+  lines.push(LANG==='zh'?"我們正以塔羅占卜來『開』此問題：請逐一對應每個牌位與牌義，說明原因與意涵，並把正/逆位的象徵轉化為具體說明與建議。":"We are using a Tarot spread to open this question: for each position, map the card to its meaning, explain why it matters, and translate upright/reversed symbolism into concrete explanations and advice.");
+  if(q) lines.push((LANG==='zh'?"問題：":"Question: ")+q);
+  lines.push((LANG==='zh'?"牌陣：":"Spread: ")+(LANG==='zh'?s.labelZh:s.labelEn));
+  lines.push(LANG==='zh'?"牌位與牌義：":"Positions & card meanings:");
+  for(var i=0;i<state.drawn.length;i++){
+    var cd=state.drawn[i], posName=decodeEntities(pos[i]||('#'+(i+1))), nm=(LANG==='zh'?cd.zhName:cd.enName), ori=cd.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright");
+    lines.push("- "+posName+" — "+nm+" ("+ori+"): "+(meaningForCard(cd, LANG)||""));
   }
-
-  // ④ Spread meta
-  lines.push( (LANG==='zh' ? "牌陣：" : "Spread: ") + (LANG==='zh' ? s.labelZh : s.labelEn) );
-
-  // ⑤ Card list with meanings (upright/reversed already resolved locally)
-  lines.push(LANG==='zh' ? "牌位與牌義：" : "Positions & card meanings:");
-  for (var i=0; i<state.drawn.length; i++){
-    var card = state.drawn[i];
-    var posName = decodeEntities(pos[i] || ('#'+(i+1)));
-    var name = (LANG==='zh' ? card.zhName : card.enName);
-    var ori  = card.reversed ? (LANG==='zh'?"逆位":"Reversed") : (LANG==='zh'?"正位":"Upright");
-    var meaning = meaningForCard(card, LANG) || "";
-    lines.push("- " + posName + " — " + name + " (" + ori + "): " + meaning);
-  }
-
-  // ⑥ Expected structure for the answer
-  lines.push(LANG==='zh'
-    ? "請先整體歸納：主題、機會/挑戰、建議與下一步；如合適，可補充時間節點或象徵提示。口吻溫和而務實。"
-    : "Then synthesize: overall theme, opportunities/challenges, advice and next steps; include timing/symbolic cues if helpful. Be warm yet practical.");
-
+  lines.push(LANG==='zh'?"請先整體歸納：主題、機會/挑戰、建議與下一步；可補充時間節點或象徵提示。口吻溫和而務實。":"Then synthesize: overall theme, opportunities/challenges, advice and next steps; include timing/symbolic cues if helpful. Be warm yet practical.");
   return lines.join("\n");
 }
+function updateAIControls(){ var askBtn=document.getElementById('btnAskAI'); var need=getNeededCount(); var ready=state.drawn && state.drawn.length>=need && need>0; if(askBtn) askBtn.disabled=!ready; }
 
-function localTemplateReading(){
-  var s=SPREADS[state.spreadType] || SPREADS["3"]; var pos=(LANG==='zh'?s.posZh:s.posEn)||[]; var q=(document.getElementById('userQ').value||'').trim();
-  var out=[]; out.push((LANG==='zh'?"🧭 總覽":"🧭 Overview"));
-  var anchor=state.drawn[0], tail=state.drawn[state.drawn.length-1]; function mk(c){ var nm=(LANG==='zh'?c.zhName:c.enName), or=c.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright"); return nm+" ("+or+"): "+(meaningForCard(c, LANG)||""); }
-  if(anchor) out.push((LANG==='zh'?"核心能量：":"Core energy: ")+mk(anchor)); if(tail && tail!==anchor) out.push((LANG==='zh'?"走向／結果：":"Trajectory / outcome: ")+mk(tail));
-  out.push(""); out.push((LANG==='zh'?"🧩 逐位解讀":"🧩 Position-by-position")); for(var i=0;i<state.drawn.length;i++){ out.push("— "+decodeEntities(pos[i]||('#'+(i+1)))+" — "+mk(state.drawn[i])); }
-  out.push(""); out.push((LANG==='zh'?"📝 建議／下一步：":"📝 Advice / next steps:"));
-  var revCount=0; for(var j=0;j<state.drawn.length;j++){ if(state.drawn[j].reversed) revCount++; }
-  if(revCount>=Math.ceil(state.drawn.length/2)){ out.push(LANG==='zh'?"• 先釐清混亂與阻力：縮小焦點，先處理可控一步。":"• Clear friction and reduce scope: take the most controllable next step first."); }
-  else{ out.push(LANG==='zh'?"• 動能良好：把握優勢，設定具體里程碑。":"• Momentum looks favorable: leverage strengths and set concrete milestones."); }
-  if(q){ out.push(LANG==='zh'?"• 回到你的問題，記錄 7–14 天內可完成的小承諾。":"• For your question, make one commitment you can complete in 7–14 days."); }
-  return out.join("\n");
-}
-
-/* Poe API (OpenAI-compatible). WARNING: direct browser calls expose your API key. */
+/* ===== Poe API (OpenAI-compatible) =====
+   Base URL: https://api.poe.com/v1  (OpenAI-compatible)
+   Endpoint: /chat/completions
+   Get your key at https://poe.com/api_key
+   Docs: Creator Platform (OpenAI-compatible)
+*/
+// async function callPoe(apiKey, model, prompt){
+//   var url="https://api.poe.com/v1/chat/completions";
+//   var body={ model: model || "Claude-Sonnet-4", messages: [{role:"user", content: prompt}] };
+//   var res=await fetch(url,{
+//     method:"POST",
+//     headers:{
+//       "Authorization":"Bearer "+apiKey,
+//       "Content-Type":"application/json"
+//     },
+//     body: JSON.stringify(body)
+//   });
+//   if(!res.ok){ throw new Error("Poe API HTTP "+res.status); }
+//   var data=await res.json();
+//   var txt=""; try{ txt = data.choices[0].message.content; }catch(e){}
+//   return txt || "";
+// }
 async function callPoe(apiKey, model, prompt){
   var url="https://api.poe.com/v1/chat/completions";          /* Official OpenAI‑compatible endpoint. Requires Poe API key. */
   var body={ model: model||"Claude-Sonnet-4", messages:[{role:"user", content: prompt}] };
@@ -520,48 +618,87 @@ async function callPoe(apiKey, model, prompt){
 }
 
 
+
+/* Offline template fallback */
+function localTemplateReading(){
+  var s=SPREADS[state.spreadType] || SPREADS["3"]; var pos=(LANG==='zh'?s.posZh:s.posEn)||[]; var q=(document.getElementById('userQ').value||'').trim();
+  var out=[]; out.push((LANG==='zh'?"🧭 總覽":"🧭 Overview"));
+  var anchor=state.drawn[0], tail=state.drawn[state.drawn.length-1];
+  function mk(c){ var nm=(LANG==='zh'?c.zhName:c.enName), or=c.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright"); return nm+" ("+or+"): "+(meaningForCard(c, LANG)||""); }
+  if(anchor) out.push((LANG==='zh'?"核心能量：":"Core energy: ")+mk(anchor));
+  if(tail && tail!==anchor) out.push((LANG==='zh'?"走向／結果：":"Trajectory / outcome: ")+mk(tail));
+  out.push(""); out.push((LANG==='zh'?"🧩 逐位解讀":"🧩 Position-by-position"));
+  for(var i=0;i<state.drawn.length;i++){ out.push("— "+decodeEntities(pos[i]||('#'+(i+1)))+" — "+mk(state.drawn[i])); }
+  out.push(""); out.push((LANG==='zh'?"📝 建議／下一步：":"📝 Advice / next steps:"));
+  var revCount=0; for(var j=0;j<state.drawn.length;j++){ if(state.drawn[j].reversed) revCount++; }
+  if(revCount>=Math.ceil(state.drawn.length/2)){ out.push(LANG==='zh'?"• 先釐清混亂與阻力：縮小焦點，先處理可控一步。":"• Clear friction and reduce scope: take the most controllable next step first."); }
+  else{ out.push(LANG==='zh'?"• 動能良好：把握優勢，設定具體里程碑。":"• Momentum looks favorable: leverage strengths and set concrete milestones."); }
+  if(q){ out.push(LANG==='zh'?"• 回到你的問題，記錄 7–14 天內可完成的小承諾。":"• For your question, make one commitment you can complete in 7–14 days."); }
+  return out.join("\n");
+}
+
+/* Ask AI dispatcher (+ prompt preview) */
 async function askAI(){
   var ans=document.getElementById('aiAnswer'), stat=document.getElementById('aiStatus');
-  var prov  = document.getElementById('aiProvider').value;
-  var keyIn = (document.getElementById('aiKey').value || '').trim();
-  var key   = keyIn || (typeof DEFAULT_POE_KEY === 'string' ? DEFAULT_POE_KEY : '')
+  var prov=document.getElementById('aiProvider').value, key=(document.getElementById('aiKey').value||'').trim();
+  var model=(document.getElementById('aiModel').value||'').trim();
+  var need=getNeededCount(); if(!state.drawn || state.drawn.length<need){ stat.innerHTML='<span class="err">'+(LANG==='zh'?'請先抽齊牌陣':'Please complete the spread first')+'</span>'; return; }
 
-  var model=(document.getElementById('aiModel').value||'').trim(); var need=getNeededCount();
-  if(!state.drawn || state.drawn.length<need){ stat.innerHTML='<span class="err">'+(LANG==='zh'?'請先抽齊牌陣':'Please complete the spread first')+'</span>'; return; }
-  var prompt=buildReadingPrompt(); 
-  
-  var promptBox = document.getElementById('aiPrompt');
-  if (promptBox) promptBox.textContent = prompt;
+  var prompt=buildReadingPrompt();
+  var promptBox=document.getElementById('aiPrompt'); if(promptBox) promptBox.textContent=prompt;
+
   stat.textContent=(LANG==='zh'?'生成中…':'Generating…'); ans.classList.add('loading'); ans.textContent="";
   try{
     var text="";
     if(prov==='local'){ text=localTemplateReading(); }
     else if(prov==='poe'){
-      if(!key) throw new Error('Poe API key required (poe.com/api_key)');
-      text = await callPoe(key, model, prompt);
-    } else { text=localTemplateReading(); }
+      if(!key){ throw new Error('Poe API key required (https://poe.com/api_key)'); }
+      text=await callPoe(key, model, prompt);
+    }else{ text=localTemplateReading(); }
     ans.textContent = text || (LANG==='zh'?'（沒有回覆）':'(no response)');
     stat.innerHTML = '<span class="ok">'+(LANG==='zh'?'完成':'Done')+'</span>';
   }catch(e){ console.error(e); stat.innerHTML='<span class="err">'+e.message+'</span>'; ans.textContent=localTemplateReading(); }
   finally{ ans.classList.remove('loading'); }
 }
 
-/* wire UI */
+/* Local key cache */
+function loadKeyFromLocal(){ try{ var v=localStorage.getItem('poe_api_key')||''; if(v){ document.getElementById('aiKey').value=v; } }catch(e){} }
+function autoSaveKey(){ try{ var v=(document.getElementById('aiKey').value||'').trim(); localStorage.setItem('poe_api_key', v); }catch(e){} }
+
+/* ===== Desktop wheel helper: map vertical wheel to horizontal inside pool ===== */
+function enablePoolWheelScroll(){
+  var wrap = document.getElementById('poolWrap'); if(!wrap) return;
+  wrap.addEventListener('wheel', function(e){
+    // If there's horizontal room to scroll, consume the wheel to move sideways
+    var maxL = wrap.scrollWidth - wrap.clientWidth;
+    if (maxL <= 0) return; // no overflow
+    var before = wrap.scrollLeft;
+    var delta = (e.deltaX !== 0 ? e.deltaX : e.deltaY);
+    if (delta === 0) return;
+    wrap.scrollLeft = Math.max(0, Math.min(maxL, wrap.scrollLeft + delta));
+    if (wrap.scrollLeft !== before){ e.preventDefault(); } // keep page still while we scroll pool
+  }, {passive:false});
+}
+
+/* wiring */
 document.getElementById('btnShuffle').addEventListener('click', shuffleDeck);
 document.getElementById('btnReset').addEventListener('click', resetReading);
 document.getElementById('lang').addEventListener('change', function(e){ setLanguage(e.target.value); populateSpreadSelect(); });
 document.getElementById('spreadSelect').addEventListener('change', function(e){ applySpread(e.target.value); });
 document.getElementById('btnLoadMap').addEventListener('click', function(){ document.getElementById('fileMap').click(); });
-document.getElementById('btnSelectFile').addEventListener('click', function(){ document.getElementById('fileMap').click(); });
-document.getElementById('fileMap').addEventListener('change', function(){ var f=this.files&&this.files[0]; if(f) ingestMapFile(f); });
+document.getElementById('btnSelectFile')?.addEventListener('click', function(){ document.getElementById('fileMap').click(); });
+document.getElementById('fileMap')?.addEventListener('change', function(){ var f=this.files&&this.files[0]; if(f) ingestMapFile(f); });
 document.getElementById('btnAskAI').addEventListener('click', askAI);
+document.getElementById('btnCopyPrompt').addEventListener('click', function(){
+  try{ var p=document.getElementById('aiPrompt').textContent||''; if(!p){ alert('No prompt yet.'); return; } navigator.clipboard.writeText(p); alert('Prompt copied.'); }catch(e){ alert('Clipboard not available'); }
+});
+document.getElementById('aiKey').addEventListener('input', autoSaveKey);
 
 /* boot */
 (function init(){
-  // Load embedded map if present
-  if(window.EMBEDDED_IMAGES && typeof window.EMBEDDED_IMAGES==='object'){ IMAGE_MAP = window.EMBEDDED_IMAGES; }
-  updateStatus(); listMissing();
-  buildDeck(); setLanguage('en'); populateSpreadSelect(); applySpread("3"); resetReading(); updateAIControls();
+  if(window.EMBEDDED_IMAGES && typeof window.EMBEDDED_IMAGES==='object'){ IMAGE_MAP=window.EMBEDDED_IMAGES; }
+  loadKeyFromLocal(); updateStatus(); listMissing(); buildDeck(); setLanguage('en'); populateSpreadSelect(); applySpread("3"); resetReading(); updateAIControls();
+  enablePoolWheelScroll();  /* ← desktop: wheel to horizontal; no pointer capture */
 })();
 </script>
 </body>
