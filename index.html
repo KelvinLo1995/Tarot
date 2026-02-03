@@ -230,15 +230,102 @@
     header{gap:8px}
     .list{max-height:120px}
   }
+
+  /* ===== Settings menu UI ===== */
+  .settings-btn{
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 50;
+    padding: 10px 12px;
+    border-radius: 999px;
+    border: 1px solid #2a3c5e;
+    background: rgba(16,24,39,.9);
+    color: var(--fg);
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    cursor: pointer;
+  }
+
+  .settings-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 60;
+  }
+
+  .settings-drawer{
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(420px, 92vw);
+    background: rgba(16,24,39,.98);
+    border-left: 1px solid #23324b;
+    z-index: 70;
+    transform: translateX(105%);
+    transition: transform .18s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.settings-open .settings-drawer{ transform: translateX(0); }
+  body.settings-open .settings-backdrop{ display:block; }
+
+  .settings-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid #23324b;
+  }
+  .settings-title{ font-weight: 700; color: var(--accent); }
+  .settings-close{
+    border: 1px solid #2a3c5e;
+    background: #101827;
+    color: var(--fg);
+    border-radius: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .settings-body{
+    padding: 12px 14px 18px;
+    overflow: auto;
+  }
+
+  .settings-group{
+    border: 1px solid #23324b;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: rgba(8, 17, 31, .35);
+  }
+
+  .settings-label{
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .settings-hint{
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    opacity: .85;
+  }
+
+  /* Make controls fill drawer width nicely */
+  .settings-drawer select,
+  .settings-drawer input{
+    width: 100%;
+    box-sizing: border-box;
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>Smith–Waite Tarot ／ 瑞德偉特塔羅</h1>
   <div class="controls">
-    <label>Language／語言：
-      <select id="lang"><option value="zh">廣東話（繁體）</option><option value="en">English</option></select>
-    </label>
     <label>Spread／牌陣：
       <select id="spreadSelect"></select>
     </label>
@@ -249,6 +336,48 @@
     <span id="status" class="status" hidden="true"></span>
   </div>
 </header>
+<!-- Settings button + drawer (minimized by default) -->
+<button id="settingsBtn" class="settings-btn" aria-controls="settingsDrawer" aria-expanded="false">
+  ⚙️ Settings
+</button>
+
+<div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+
+<aside id="settingsDrawer" class="settings-drawer" aria-hidden="true">
+  <div class="settings-head">
+    <div class="settings-title">Settings／設定</div>
+    <button id="settingsClose" class="settings-close" aria-label="Close">✕</button>
+  </div>
+
+  <div class="settings-body">
+    <!-- Mount points: we will move existing controls here (same IDs, no logic rewrite) -->
+    <div class="settings-group">
+      <div class="settings-label">Language／語言</div>
+      <select id="lang"><option value="zh">廣東話（繁體）</option><option value="en">English</option></select>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label">AI Provider</div>
+      <!-- <div id="aiProvider"></div> -->
+      <select id="aiProvider">
+            <option value="local">Offline (no API)／離線</option>
+            <option value="poe" selected>Poe API（OpenAI‑compatible）</option>
+      </select>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label">Poe API Key</div>
+      <input id="aiKey" type="password" placeholder="sk_... from https://poe.com/api_key (auto-saved)"/>
+      <div class="settings-hint">Key is cached on this device (localStorage).</div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label">Model/Bot</div>
+      <input id="aiModel" type="text" value="Assistant"/>
+      <div class="settings-hint">Example: Claude-Sonnet-4 / GPT-4o / etc.</div>
+    </div>
+  </div>
+</aside>
 
 <main>
   <!-- 1) Question + AI -->
@@ -258,26 +387,20 @@
     <div class="controls" style="margin-top:8px;gap:10px;align-items:flex-start">
       <textarea id="userQ" rows="3" placeholder="Type your question／請輸入你的問題" style="flex:1;min-width:240px"></textarea>
       <div style="display:flex;flex-direction:column;gap:6px;min-width:300px">
-        <label>Provider
-          <select id="aiProvider">
-            <option value="local" selected>Offline (no API)／離線</option>
-            <option value="poe">Poe API（OpenAI‑compatible）</option>
-          </select>
-        </label>
-        <label>Poe API Key
-          <input id="aiKey" type="password" placeholder="sk_... from https://poe.com/api_key (auto-saved)"/>
-        </label>
-        <label>Model/Bot
-          <input id="aiModel" type="text" value="Assistant"/>
-        </label>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button id="btnAskAI" class="primary" disabled>🤖 Ask AI</button>
           <span id="aiStatus" class="status"></span>
         </div>
       </div>
     </div>
-
-    <div id="aiAnswer" class="legend" style="white-space:pre-wrap;margin-top:10px"></div>
+    <div>
+        <button id="btnAskAI" class="primary" style="margin-top: 10px;" disabled>🤖 Ask AI</button>
+    </div>
+    
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:300px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <div id="aiAnswer" class="legend" style="white-space:pre-wrap;margin-top:10px"></div>
+        </div>
+    </div>
 
     <!-- Prompt preview -->
     <div id="aiPromptWrap" class="legend" style="margin-top:10px">
@@ -297,7 +420,7 @@
         <div class="poolRow" id="poolRow1"></div>
       </div>
     </div>
-    <details><summary>Missing／未找到清單</summary><div id="missing" class="list">(none／沒有)</div></details>
+    <details><summary hidden="true">Missing／未找到清單</summary><div id="missing" class="list" hidden="true">(none／沒有)</div></details>
   </section>
 
   <!-- 3) Spread -->
@@ -742,19 +865,73 @@ function populateSpreadSelect(){
 }
 
 /* ===== Tarot prompt + Poe API ===== */
+// function buildReadingPrompt(){
+//   var s=SPREADS[state.spreadType] || SPREADS["3"]; var pos=(LANG==='zh'?s.posZh:s.posEn)||[]; var q=(document.getElementById('userQ').value||'').trim(); var lines=[];
+//   lines.push(LANG==='zh'?"你是一位理解瑞德偉特（RWS）塔羅的直覺式占卜師，請依據下列牌陣提供清晰、務實的解讀。":"You are an intuitive tarot reader versed in Rider–Waite–Smith. Use the spread below and give a clear, practical reading.");
+//   lines.push(LANG==='zh'?"我們正以塔羅占卜來『開』此問題：請逐一對應每個牌位與牌義，說明原因與意涵，並把正/逆位的象徵轉化為具體說明與建議。":"We are using a Tarot spread to open this question: for each position, map the card to its meaning, explain why it matters, and translate upright/reversed symbolism into concrete explanations and advice.");
+//   if(q) lines.push((LANG==='zh'?"問題：":"Question: ")+q);
+//   lines.push((LANG==='zh'?"牌陣：":"Spread: ")+(LANG==='zh'?s.labelZh:s.labelEn));
+//   lines.push(LANG==='zh'?"牌位與牌義：":"Positions & card meanings:");
+//   for(var i=0;i<state.drawn.length;i++){
+//     var cd=state.drawn[i], posName=decodeEntities(pos[i]||('#'+(i+1))), nm=(LANG==='zh'?cd.zhName:cd.enName), ori=cd.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright");
+//     lines.push("- "+posName+" — "+nm+" ("+ori+"): "+(meaningForCard(cd, LANG)||""));
+//   }
+//   lines.push(LANG==='zh'?"請先整體歸納：主題、機會/挑戰、建議與下一步；可補充時間節點或象徵提示。口吻溫和而務實。":"Then synthesize: overall theme, opportunities/challenges, advice and next steps; include timing/symbolic cues if helpful. Be warm yet practical.");
+//   return lines.join("\n");
+// }
+
 function buildReadingPrompt(){
-  var s=SPREADS[state.spreadType] || SPREADS["3"]; var pos=(LANG==='zh'?s.posZh:s.posEn)||[]; var q=(document.getElementById('userQ').value||'').trim(); var lines=[];
-  lines.push(LANG==='zh'?"你是一位理解瑞德偉特（RWS）塔羅的直覺式占卜師，請依據下列牌陣提供清晰、務實的解讀。":"You are an intuitive tarot reader versed in Rider–Waite–Smith. Use the spread below and give a clear, practical reading.");
-  lines.push(LANG==='zh'?"我們正以塔羅占卜來『開』此問題：請逐一對應每個牌位與牌義，說明原因與意涵，並把正/逆位的象徵轉化為具體說明與建議。":"We are using a Tarot spread to open this question: for each position, map the card to its meaning, explain why it matters, and translate upright/reversed symbolism into concrete explanations and advice.");
-  if(q) lines.push((LANG==='zh'?"問題：":"Question: ")+q);
-  lines.push((LANG==='zh'?"牌陣：":"Spread: ")+(LANG==='zh'?s.labelZh:s.labelEn));
-  lines.push(LANG==='zh'?"牌位與牌義：":"Positions & card meanings:");
-  for(var i=0;i<state.drawn.length;i++){
-    var cd=state.drawn[i], posName=decodeEntities(pos[i]||('#'+(i+1))), nm=(LANG==='zh'?cd.zhName:cd.enName), ori=cd.reversed?(LANG==='zh'?"逆位":"Reversed"):(LANG==='zh'?"正位":"Upright");
-    lines.push("- "+posName+" — "+nm+" ("+ori+"): "+(meaningForCard(cd, LANG)||""));
+  var s = SPREADS[state.spreadType] || SPREADS["3"];
+  var pos = (LANG==='zh' ? s.posZh : s.posEn) || [];
+  var q   = (document.getElementById('userQ').value || '').trim();
+
+  // Build a compact card list
+  var lines = [];
+  for (var i=0; i<state.drawn.length; i++){
+    var cd = state.drawn[i];
+    var posName = decodeEntities(pos[i] || ('#'+(i+1)));
+    var nm  = (LANG==='zh' ? cd.zhName : cd.enName);
+    var ori = cd.reversed ? (LANG==='zh'?"逆位":"Reversed") : (LANG==='zh'?"正位":"Upright");
+    // We include the short meaning as a hint (your meaningForCard already works well)
+    var hint = meaningForCard(cd, LANG) || "";
+    lines.push("- " + posName + " — " + nm + " (" + ori + "): " + hint);
   }
-  lines.push(LANG==='zh'?"請先整體歸納：主題、機會/挑戰、建議與下一步；可補充時間節點或象徵提示。口吻溫和而務實。":"Then synthesize: overall theme, opportunities/challenges, advice and next steps; include timing/symbolic cues if helpful. Be warm yet practical.");
-  return lines.join("\n");
+
+  var head = (LANG==='zh'
+    ? [
+        "你是一位理解瑞德偉特（RWS）塔羅的占卜師。",
+        "我們用這個牌陣來『開』以下問題，請你以整體牌陣作為一個系統來解讀（先總結，再分位），不要只逐張分開講。",
+        "",
+        "【輸出格式】",
+        "1) 先直接回應問題（用整個牌陣的結論）。",
+        "2) 整體歸納（主題/能量走向、主要矛盾、重複訊號：大牌比例、同花色偏重、逆位比例）。",
+        "3) 牌位串連（用 2–5 個關鍵連結解釋『為何得出這個結論』，再補充每個牌位一句重點作證）。",
+        "4) 建議與下一步（3 條可執行行動 + 1 條要避免的陷阱）。",
+        "5) 若是二選一牌陣：請比較 A 與 B，列出 A/B 的利弊、風險、以及更適合當事人的選擇條件。",
+        "",
+        "【問題】" + (q || "（未提供，請以牌陣作一般指引）"),
+        "【牌陣】" + (LANG==='zh' ? s.labelZh : s.labelEn),
+        "【牌位與提示牌義】",
+        lines.join("\n")
+      ].join("\n")
+    : [
+        "You are a Rider–Waite–Smith tarot reader.",
+        "We are using this spread to open the question. Read the spread as one coherent system (synthesize first, then positions). Do NOT only give isolated card-by-card notes.",
+        "",
+        "OUTPUT FORMAT:",
+        "1) Answer the question directly using the overall spread conclusion.",
+        "2) Spread-level synthesis (theme/trajectory, key tensions, repeating signals: major-arcana weight, suit dominance, reversed ratio).",
+        "3) Link the positions (2–5 key connections explaining WHY), then give one short line per position as evidence.",
+        "4) Advice & next steps (3 concrete actions + 1 pitfall to avoid).",
+        "5) If this is an either/or spread: compare Option A vs Option B with pros/cons, risks, and conditions for choosing.",
+        "",
+        "QUESTION: " + (q || "(none provided; give general guidance from the spread)"),
+        "SPREAD: " + (LANG==='zh' ? s.labelZh : s.labelEn),
+        "POSITIONS + meaning hints:",
+        lines.join("\n")
+      ].join("\n"));
+
+  return head;
 }
 function updateAIControls(){ var askBtn=document.getElementById('btnAskAI'); var need=getNeededCount(); var ready=state.drawn && state.drawn.length>=need && need>0; if(askBtn) askBtn.disabled=!ready; }
 
@@ -836,6 +1013,52 @@ function enableHorizontalWheel(scroller){
   }, {passive:false});
 }
 
+function openSettings(){
+  document.body.classList.add('settings-open');
+  document.getElementById('settingsBackdrop').hidden = false;
+  document.getElementById('settingsBtn').setAttribute('aria-expanded','true');
+  document.getElementById('settingsDrawer').setAttribute('aria-hidden','false');
+}
+function closeSettings(){
+  document.body.classList.remove('settings-open');
+  document.getElementById('settingsBackdrop').hidden = true;
+  document.getElementById('settingsBtn').setAttribute('aria-expanded','false');
+  document.getElementById('settingsDrawer').setAttribute('aria-hidden','true');
+}
+
+/* Move existing controls (same IDs) into the drawer mount points */
+function mountSettingsControls(){
+  // These IDs already exist in your working app:
+  // #lang, #aiProvider, #aiKey, #aiModel
+  var lang = document.getElementById('lang');
+  var prov = document.getElementById('aiProvider');
+  var key  = document.getElementById('aiKey');
+  var model= document.getElementById('aiModel');
+
+  // Move the actual elements (not clones) so existing listeners keep working
+  //if(lang)  document.getElementById('mountLang').appendChild(lang);
+  //if(prov)  document.getElementById('mountProvider').appendChild(prov);
+  //if(key)   document.getElementById('mountKey').appendChild(key);
+  //if(model) document.getElementById('mountModel').appendChild(model);
+}
+
+function wireSettingsUI(){
+  var btn = document.getElementById('settingsBtn');
+  var back= document.getElementById('settingsBackdrop');
+  var cls = document.getElementById('settingsClose');
+
+  btn.addEventListener('click', function(){
+    if(document.body.classList.contains('settings-open')) closeSettings();
+    else openSettings();
+  });
+  back.addEventListener('click', closeSettings);
+  cls.addEventListener('click', closeSettings);
+
+  window.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeSettings();
+  });
+}
+
 /* wiring */
 document.getElementById('btnShuffle').addEventListener('click', shuffleDeck);
 document.getElementById('btnReset').addEventListener('click', resetReading);
@@ -853,8 +1076,9 @@ document.getElementById('aiKey').addEventListener('input', autoSaveKey);
 /* boot */
 (function init(){
   if(window.EMBEDDED_IMAGES && typeof window.EMBEDDED_IMAGES==='object'){ IMAGE_MAP=window.EMBEDDED_IMAGES; }
-  loadKeyFromLocal(); updateStatus(); listMissing(); buildDeck(); setLanguage('en'); populateSpreadSelect(); applySpread("3"); resetReading(); updateAIControls();
-
+  loadKeyFromLocal(); updateStatus(); listMissing(); buildDeck(); setLanguage('zh'); populateSpreadSelect(); applySpread("3"); resetReading(); updateAIControls();
+  mountSettingsControls();
+  wireSettingsUI();
   /* enable wheel → horizontal for both scrollers */
   enableHorizontalWheel(document.getElementById('poolWrap'));
   enableHorizontalWheel(document.getElementById('spreadWrap'));
