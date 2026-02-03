@@ -401,15 +401,6 @@
           <div id="aiAnswer" class="legend" style="white-space:pre-wrap;margin-top:10px"></div>
         </div>
     </div>
-
-    <!-- Prompt preview -->
-    <div id="aiPromptWrap" class="legend" style="margin-top:10px">
-      <details open>
-        <summary>Prompt sent to Assistant ／ 傳送到 AI 的提示</summary>
-        <pre id="aiPrompt" class="list" style="white-space:pre-wrap; margin-top:6px"></pre>
-        <div class="controls" style="margin-top:6px"><button id="btnCopyPrompt">📋 Copy Prompt</button></div>
-      </details>
-    </div>
   </section>
 
   <!-- 2) Pool -->
@@ -436,6 +427,15 @@
   <section id="summary">
     <h2>Summary／解讀摘要</h2>
     <div id="summaryBody" class="legend">Draw cards to see the reading here.／抽完牌後會顯示總結。</div>
+
+    <!-- Prompt preview -->
+    <div id="aiPromptWrap" class="legend" style="margin-top:10px">
+      <details>
+        <summary>Prompt sent to Assistant ／ 傳送到 AI 的提示</summary>
+        <pre id="aiPrompt" class="list" style="white-space:pre-wrap; margin-top:6px"></pre>
+        <div class="controls" style="margin-top:6px"><button id="btnCopyPrompt">📋 Copy Prompt</button></div>
+      </details>
+    </div>
   </section>
 
   <!-- 5) (Hidden) Map Loader -->
