@@ -368,14 +368,20 @@
     <div class="settings-group">
       <div class="settings-label">Poe API Key</div>
       <input id="aiKey" type="password" placeholder="sk_... from https://poe.com/api_key (auto-saved)"/>
+      <!-- Quick link to create/get a Poe API Key (always opens in a new web tab) -->
       
-      <!-- Quick link to create/get a Poe API Key -->
+      
       <div class="settings-hint" style="margin-top:6px">
         Don’t have a key?
-        <a href="https://poe.com/api_key" target="_blank" rel="noopener noreferrer">
-          Generate a Poe API Key
-        </a>
+        <button id="poeKeyLinkBtn" type="button"
+                style="all:unset; color:#66b1ff; cursor:pointer; text-decoration:underline;">
+          🔑 Generate a Poe API Key
+        </button>
+        <span id="poeKeyMsg" style="margin-left:8px; color:#ffd48f; display:none;">
+          (Please allow pop‑ups for this site)
+        </span>
       </div>
+
 
     </div>
 
@@ -468,6 +474,78 @@ var CARD_BACK_DATA_URL = "data:image/svg+xml;utf8,\
 <path d='M32,14 v332M50,14 v332M68,14 v332M86,14 v332M104,14 v332M122,14 v332M140,14 v332M158,14 v332M176,14 v332'/>\
 <path d='M14,32 h192M14,50 h192M14,68 h192M14,86 h192M14,104 h192M14,122 h192M14,140 h192M14,158 h192M14,176 h192M14,194 h192M14,212 h192M14,230 h192M14,248 h192M14,266 h192M14,284 h192M14,302 h192M14,320 h192'/>\
 </g></svg>";
+</script>
+
+<script>
+  (function () {
+    // 0) Defensive: remove any old anchor that might still exist
+    const oldA = document.getElementById('poeKeyLink');
+    if (oldA && oldA.parentNode) oldA.parentNode.removeChild(oldA);
+
+    const btn = document.getElementById('poeKeyLinkBtn');
+    const hint = document.getElementById('poeKeyMsg');
+    if (!btn) return;
+
+    const POE_URL = 'https://poe.com/api_key';
+
+    // Make sure no parent handlers steal the click
+    btn.addEventListener('click', function (e) {
+      // Hard-stop all default & bubbling paths
+      if (e) {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        e.stopImmediatePropagation?.();
+      }
+
+      // Build a tiny HTML page that redirects itself in the NEW TAB
+      const html = String.raw`<!doctype html>
+<meta charset="utf-8">
+<title>Opening Poe…</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="0;url=${POE_URL}">
+<style>
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:24px;color:#223}
+  a{color:#06c}
+</style>
+<p>Opening Poe API Key page… If nothing happens,
+  ${POE_URL}tap here</a>.
+</p>
+<script>
+  try { location.replace(${JSON.stringify(POE_URL)}) }
+  catch(e){ location.href = ${JSON.stringify(POE_URL)} }
+<\/script>`;
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+
+      // Open the blob page in a fresh tab (user gesture).
+      // 'noopener' severs the opener; we deliberately avoid 'noreferrer' here to keep referrer minimal issues away.
+      const w = window.open(url, '_blank', 'noopener');
+
+      // Clean up the object URL
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      // CRITICAL: Do NOT navigate current tab even if popup is blocked.
+      if (!w) {
+        // Show a gentle hint instead of navigating current tab
+        if (hint) {
+          hint.style.display = 'inline';
+          // auto-hide after a few seconds
+          setTimeout(() => (hint.style.display = 'none'), 5000);
+        }
+      }
+
+      return false; // extra guard in some handlers
+    }, { passive: false, capture: true });
+
+    // Also guard against keypress "Enter" triggering form submit navigation
+    btn.addEventListener('keydown', (e) => {
+      if (e?.key === 'Enter' || e?.key === ' ') {
+        e.preventDefault?.();
+        btn.click();
+      }
+    }, { passive: false, capture: true });
+  })();
 </script>
 
 <!-- =====================  EMBEDDED IMAGES  ===================== -->
